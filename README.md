@@ -1,0 +1,7 @@
+# Ioscript
+
+```
+"Hello, world!" print
+
+
+```

@@ -1,0 +1,24 @@
+{
+  "name": "Ioscript",
+  "version": "0.0.0",
+  "description": "An interpreter for Io language.",
+  "main": "main.js",
+  "scripts": {
+    "test": "mocha"
+  },
+  "keywords": [
+    "interpreter",
+    "language"
+  ],
+  "author": "Prace Fen",
+  "license": "BSD",
+
+  "devDependencies": {
+    "jison": ">= 0.4.13",
+    "mocha": ">= 1.17.1"
+  },
+  "scripts": {
+    "refresh": "jison io.jison",
+    "test": "npm run-script refresh; mocha"
+   }
+}
