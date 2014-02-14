@@ -1,76 +1,122 @@
 %lex
 
+%x COMMENT STRING
+
 %%
 
-\-?[0-9]+              return 'INTEGER';
-\-?[0-9]+("."[0-9]+)   return 'FLOAT';
+<<EOF>>                 return 'EOF'
+ 
+<INITIAL>\#             this.begin('COMMENT');
+<COMMENT>.              /* do nothing */
+<COMMENT>\n             this.begin('INITIAL');
 
-[a-zA-Z_][a-zA-z0-9_]* { return 'IDENTIFIER'; }
 
-("!"|"@"|"#"|"$"|"%"|"^"|"&"|"*"|"("|")"|"-"|"_"|"+"|"="|"{"|"}"|"["|"]"|":"|";"|"\""|"'"|"<"|">"|"."|"?"|"|")+       return 'OPERATOR'
+<INITIAL>'"'            {
+                            this.begin('STRING');
+                            yy.current_str = "";
+                        }
+<STRING>'"'             {
+                            this.begin('INITIAL');
+                            return 'String';
+                        }
+<STRING>.               { yy.current_str += yytext; }
+<STRING>\n              { yy.current_str += yytext; }
 
-"("                   return '(';
-")"                   return ')';
-"["                   return '[';
-"]"                   return ']';
-"!"                   return '!';
 
-\s+                   /* skip */
-";"                   return ';';
-\n                    return 'LF';
-<<EOF>>               return 'EOF';
+(\:|\.|\'|\~|\!|\@|\$|\%|\^|\&|\*|\-|\+|\/|\=|\||\\|\<|\>|\?)+ {
+    return 'Operator';
+}
+
+","                     return ',';
+"("                     return '(';
+")"                     return ')';
+"["                     return '[';
+"]"                     return ']';
+"if"                    return 'IF';
+
+[0-9]+                  return 'Integer';
+[0-9]+("."[0-9]+)\b     return 'Float';
+[a-zA-Z_][a-zA-Z0-9_]*  return 'Name';
+
+";"                     return ';';
+\n                      return 'LF';
+
+[ \f\t\r]*              /* skip */
 
 /lex
 
-/* operator associations and precedence 
-
-%left '+' '-'
-%left '*' '/'
-%left '^'
-
-*/
-
-%start expression_list
+%start file
 
 %%
 
-end
+file
+    : expressions EOF
+    ;
+
+Term
     : ';' LF
-    | LF
     | ';'
-    | EOF
+    | LF
     ;
 
-term
-    : IDENTIFIER {
-        $$ = new yy.Identifier(yytext);
+Identifier
+    : Name
+    | Operator
+    ;
+
+List
+    : '[' ']'
+        { $$ = yy.env.List.create([]); }
+    | '[' list_content ']'
+        { $$ = yy.env.List.create($list_content); }
+    ;
+
+list_content
+    : expression {
+        $$ = [$expression];
     }
-    | INTEGER {
-        $$ = new yy.Integer(yytext);
-    }
-    | FLOAT {
-        $$ = new yy.Float(yytext);
+    | list_content ',' expression {
+        $$ = $list_content;
+        $list_content.push($expression);
     }
     ;
 
-argument_list
-    : expression
-    | argument_list ',' expression
-    ;
-    
-expression_list
-    : expression_list expression
+expressions
+    : expressions expression
     | expression
     ;
 
 expression
-    : term IDENTIFIER end {
-        $$ = $term.value()[$2]();
+    : e Name {
+        $$ = $1.get($2).apply($1);
     }
-    | term IDENTIFIER argument_list end {
+    | e Operator expression {
+        if ($Operator == ":=") {
+            yy.env[$e] = $expression;
+            return $expression;
+        }
     }
-    | term OPERATOR end {
-        $$ = $term.value()[$2]();
+    | IF '(' expression ')' {
+        $$ = yy.env.Boolean.create($expression);
     }
-    | term OPERATOR argument_list end
+    | e
+    ;
+
+e
+    : Integer
+        { $$ = yy.env.Integer.create(yytext); }
+    | Float
+        { $$ = yy.env.Float.create(yytext); }
+    | String
+        { $$ = yy.env.String.create(yy.current_str); }
+    | Name {
+        n = yy.env[$Name];
+        if (n === undefined) {
+            $$ = $Name;
+        } else {
+            $$ = n;    
+        }
+    }
+    | List
+    }
     ;
